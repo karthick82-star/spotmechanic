@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TheSpot Mechanic</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mut:#667085;--br:#e2e5ea;--ac:#f97316;--ok:#16a34a;--bad:#dc2626;--map:#e8efe6;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111418;--card:#1a1e24;--tx:#eceff3;--mut:#9aa3b0;--br:#2b313a;--map:#1d2a22}}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx)}
+header{padding:16px;text-align:center}
+header h1{margin:0;font-size:22px}header h1 span{color:var(--ac)}
+header p{margin:4px 0 0;color:var(--mut);font-size:13px}
+nav{display:flex;gap:6px;justify-content:center;padding:0 12px 12px}
+nav button{flex:1;max-width:140px;padding:10px;border:1px solid var(--br);background:var(--card);color:var(--tx);border-radius:10px;font-weight:600;cursor:pointer}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+main{max-width:760px;margin:0 auto;padding:0 12px 40px}
+.card{background:var(--card);border:1px solid var(--br);border-radius:14px;padding:14px;margin-bottom:12px}
+h2{font-size:16px;margin:0 0 10px}
+label{display:block;font-size:12px;color:var(--mut);margin:8px 0 4px}
+select,input,textarea{width:100%;padding:10px;border:1px solid var(--br);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.btn{padding:10px 14px;border:0;border-radius:8px;background:var(--ac);color:#fff;font-weight:600;cursor:pointer}
+.btn.g{background:var(--ok)}.btn.r{background:var(--bad)}.btn.o{background:var(--bg);color:var(--tx);border:1px solid var(--br)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+#map{position:relative;height:260px;background:var(--map);border-radius:12px;overflow:hidden;border:1px solid var(--br);
+background-image:linear-gradient(var(--br) 1px,transparent 1px),linear-gradient(90deg,var(--br) 1px,transparent 1px);background-size:12.5% 12.5%}
+.pin{position:absolute;transform:translate(-50%,-50%);font-size:20px;transition:left 2.5s linear,top 2.5s linear;text-align:center;line-height:1}
+.pin small{display:block;font-size:9px;background:var(--card);padding:1px 4px;border-radius:6px;border:1px solid var(--br);margin-top:2px;white-space:nowrap}
+.pin.off{opacity:.35}
+#ring{position:absolute;left:50%;top:50%;border:2px dashed var(--ac);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:.6}
+.shop{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--br);font-size:14px}
+.shop:first-of-type{border-top:0}
+.tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:99px;background:var(--bg);border:1px solid var(--br);margin-left:4px}
+.tag.ok{color:var(--ok);border-color:var(--ok)}.tag.bad{color:var(--bad);border-color:var(--bad)}
+.steps{display:flex;gap:4px;margin:10px 0}
+.steps div{flex:1;text-align:center;font-size:10px;padding:6px 2px;border-radius:6px;background:var(--bg);border:1px solid var(--br);color:var(--mut)}
+.steps div.d{background:var(--ok);color:#fff;border-color:var(--ok)}
+.stars button{font-size:26px;background:none;border:0;cursor:pointer;color:var(--ac)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:6px;border-bottom:1px solid var(--br)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.stats div{background:var(--card);border:1px solid var(--br);border-radius:12px;padding:10px;text-align:center}
+.stats b{display:block;font-size:20px}.stats span{font-size:11px;color:var(--mut)}
+.muted{color:var(--mut);font-size:13px}
+.scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<header>
+<h1>TheSpot <span>Mechanic</span></h1>
+<p>Breakdown Anywhere. Mechanic Everywhere.</p>
+</header>
+<nav id="nav"></nav>
+<main id="app"></main>
+
+<script>
+const PROBLEMS={puncture:["Puncture","tube"],battery:["Battery dead","battery"],engine:["Engine trouble","oil"],brake:["Brake issue","brakepad"],chain:["Chain / belt","chain"],start:["Starting issue","plug"],tow:["Towing needed","tow"]};
+const STEPS=["searching","accepted","ontheway","arrived","repairing","completed"];
+const LABEL={searching:"Searching",accepted:"Accepted",ontheway:"On the way",arrived:"Arrived",repairing:"Repairing",completed:"Completed",cancelled:"Cancelled"};
+const S={
+ tab:"user",radius:5,vehicle:"bike",problem:"puncture",note:"",mshop:1,reqId:null,nextId:1,
+ shops:[
+  {id:1,name:"Sri Murugan Garage",dx:1.2,dy:-0.8,rating:4.6,online:true,verified:true,types:["bike","car"],kit:["tube","chain","plug","battery"]},
+  {id:2,name:"Ravi Two-Wheeler Care",dx:-2.1,dy:1.5,rating:4.2,online:true,verified:true,types:["bike"],kit:["tube","chain","plug","oil"]},
+  {id:3,name:"Highway Auto Works",dx:3.4,dy:2.2,rating:4.8,online:true,verified:true,types:["car","bike"],kit:["battery","brakepad","oil","tow"]},
+  {id:4,name:"Kumar Motors",dx:-4.5,dy:-3.0,rating:3.9,online:false,verified:true,types:["car"],kit:["battery","oil","brakepad"]},
+  {id:5,name:"QuickFix Mobile",dx:0.6,dy:3.9,rating:4.4,online:true,verified:false,types:["bike","car"],kit:["tube","plug"]},
+  {id:6,name:"Anand Tyres and Tow",dx:-1.0,dy:-5.5,rating:4.5,online:true,verified:true,types:["car","bike"],kit:["tube","tow","battery"]}
+ ],
+ reqs:[],complaints:0
+};
+const dist=s=>Math.hypot(s.dx,s.dy);
+const eligible=()=>S.shops.filter(s=>s.verified&&s.online&&s.types.includes(S.vehicle)&&dist(s)<=S.radius);
+const myReq=()=>S.reqs.find(r=>r.id===S.reqId);
+const shopById=id=>S.shops.find(s=>s.id===id);
+const $=id=>document.getElementById(id);
+
+function broadcast(){
+ const el=eligible();
+ 
+ if(!el.length){alert("No eligible shops in this radius. Try a bigger radius.");return;}
+ const r={id:S.nextId++,vehicle:S.vehicle,problem:S.problem,note:S.note,status:"searching",shop:null,eligible:el.map(s=>s.id),price:0,eta:0,final:0,rating:0,paid:false,started:Date.now()};
+ S.reqs.push(r);S.reqId=r.id;render();
+}
+function accept(rid,sid){
+ const r=S.reqs.find(x=>x.id===rid);
+ if(!r||r.status!=="searching"){alert("Sorry, this job was already taken.");render();return;}
+ const s=shopById(sid);
+ r.status="accepted";r.shop=sid;r.eta=Math.max(3,Math.round(dist(s)*4));
+ r.price=150+Math.round(dist(s)*20)+(r.problem==="tow"?600:r.problem==="engine"?400:100);
+ render();
+}
+function reject(rid,sid){const r=S.reqs.find(x=>x.id===rid);r.eligible=r.eligible.filter(i=>i!==sid);render();}
+function advance(rid){
+ const r=S.reqs.find(x=>x.id===rid);const i=STEPS.indexOf(r.status);
+ if(i<STEPS.length-1){r.status=STEPS[i+1];if(r.status==="completed")r.final=r.price;}
+ render();
+}
+function pay(){const r=myReq();r.paid=true;render();}
+function rate(n){const r=myReq();r.rating=n;const s=shopById(r.shop);s.rating=Math.round((s.rating*9+n)/10*10)/10;render();}
+function newReq(){S.reqId=null;render();}
+function cancel(){const r=myReq();if(r.status==="searching"||r.status==="accepted"){r.status="cancelled";}render();}
+
+function mapHTML(r){
+ const sc=50/6.5;
+ let h='<div id="map"><div id="ring" style="width:'+(S.radius*sc*2)+'%;height:'+(S.radius*sc*2*260/Math.max(1,$("app").clientWidth-30)*1)+'px"></div>';
+ const els=eligible().map(s=>s.id);
+ S.shops.forEach(s=>{
+  if(r&&r.shop===s.id)return;
+  const dim=!els.includes(s.id)?" off":"";
+  h+='<div class="pin'+dim+'" style="left:'+(50+s.dx*sc)+'%;top:'+(50+s.dy*sc)+'%">🔧<small>'+s.name.split(" ")[0]+'</small></div>';
+ });
+ if(r&&r.shop){
+  const s=shopById(r.shop),i=STEPS.indexOf(r.status);
+  const p=i>=3?1:i===2?0.6:0;
+  const x=s.dx*(1-p),y=s.dy*(1-p);
+  h+='<div class="pin" style="left:'+(50+x*sc)+'%;top:'+(50+y*sc)+'%">🛠️<small>'+s.name.split(" ")[0]+'</small></div>';
+ }
+ h+='<div class="pin" style="left:50%;top:50%">'+(S.vehicle==="car"?"🚗":"🏍️")+'<small>You</small></div></div>';
+ return h;
+}
+function userView(){
+ const r=myReq();
+ if(!r){
+  const el=eligible();
+  let h='<div class="card"><h2>Report a breakdown</h2><div class="row"><div><label>Vehicle</label><select id="veh"><option value="bike">Bike / Scooter</option><option value="car">Car</option></select></div>'+
+  '<div><label>Search radius</label><select id="rad"><option>2</option><option>5</option><option>10</option></select></div></div>'+
+  '<label>Problem</label><select id="prob">'+Object.entries(PROBLEMS).map(([k,v])=>'<option value="'+k+'">'+v[0]+'</option>').join("")+'</select>'+
+  '<label>Details (optional)</label><textarea id="note" rows="2" placeholder="e.g. Near the bus stand, rear tyre flat"></textarea>'+
+  '<p class="muted">📍 Demo location is simulated. A real app asks for GPS permission.</p></div>';
+  h+='<div class="card"><h2>Nearby mechanics</h2>'+mapHTML(null)+'<div style="margin-top:8px">';
+  const sorted=[...S.shops].sort((a,b)=>dist(a)-dist(b));
+  sorted.forEach(s=>{
+   const ok=el.includes(s),has=s.kit.includes(PROBLEMS[S.problem][1]);
+   h+='<div class="shop"><div><b>'+s.name+'</b>'+(s.verified?'':'<span class="tag bad">unverified</span>')+'<br><span class="muted">'+dist(s).toFixed(1)+' km · ⭐ '+s.rating+' · '+(s.online?'Online':'Offline')+'</span></div>'+
+   '<div>'+(has?'<span class="tag ok">has parts</span>':'<span class="tag">no part</span>')+(ok?'':'<span class="tag bad">out of scope</span>')+'</div></div>';
+  });
+  h+='</div><p style="margin:12px 0 0"><button class="btn" id="send">Broadcast request to '+el.length+' shop(s)</button></p></div>';
+  return h;
+ }
+ const s=r.shop?shopById(r.shop):null,i=STEPS.indexOf(r.status);
+ let h='<div class="card"><h2>Request #'+r.id+' · '+PROBLEMS[r.problem][0]+'</h2>'+mapHTML(r);
+ if(r.status==="cancelled")h+='<p><span class="tag bad">Cancelled</span></p>';
+ else{
+  h+='<div class="steps">'+STEPS.map((x,k)=>'<div class="'+(k<=i?'d':'')+'">'+LABEL[x]+'</div>').join("")+'</div>';
+  if(r.status==="searching")h+='<p>📡 Sent to '+r.eligible.length+' shop(s). Waiting for the first mechanic to accept...</p>';
+  else h+='<p><b>'+s.name+'</b> · ⭐ '+s.rating+'<br><span class="muted">ETA '+r.eta+' min · Estimate ₹'+r.price+' (visit fee ₹150 + labour + parts)</span></p>';
+  if(r.status==="completed"){
+   h+='<p><b>Final bill: ₹'+r.final+'</b> '+(r.paid?'<span class="tag ok">Paid</span>':'<button class="btn g" id="pay">Pay now (demo)</button>')+'</p>';
+   if(r.paid)h+='<div class="stars">'+[1,2,3,4,5].map(n=>'<button data-s="'+n+'">'+(n<=r.rating?'★':'☆')+'</button>').join("")+'</div>';
+  }
+  if(r.status==="searching"||r.status==="accepted")h+='<button class="btn r" id="cancel">Cancel request</button>';
+ }
+ h+=' <button class="btn o" id="new">New request</button></div>';
+ return h;
+}
+function mechView(){
+ let h='<div class="card"><h2>Mechanic app</h2><label>Logged in as shop</label><select id="msel">'+S.shops.map(s=>'<option value="'+s.id+'"'+(s.id===S.mshop?' selected':'')+'>'+s.name+'</option>').join("")+'</select>';
+ const s=shopById(S.mshop);
+ h+='<p><button class="btn '+(s.online?'g':'o')+'" id="tog">'+(s.online?'● Online (tap to go offline)':'○ Offline (tap to go online)')+'</button></p>'+
+ '<p class="muted">Parts in stock: '+s.kit.join(", ")+'</p></div>';
+ const inc=S.reqs.filter(r=>r.status==="searching"&&r.eligible.includes(s.id)&&s.online);
+ h+='<div class="card"><h2>Incoming requests</h2>';
+ if(!inc.length)h+='<p class="muted">No requests right now. Send one from the User tab.</p>';
+ inc.forEach(r=>{
+  h+='<div class="shop"><div><b>'+(r.vehicle==="car"?"🚗":"🏍️")+' '+PROBLEMS[r.problem][0]+'</b>'+(s.kit.includes(PROBLEMS[r.problem][1])?'<span class="tag ok">you have parts</span>':'<span class="tag bad">parts missing</span>')+
+  '<br><span class="muted">'+dist(s).toFixed(1)+' km away'+(r.note?' · "'+r.note.replace(/</g,"&lt;")+'"':'')+'</span></div><div><button class="btn g" data-a="'+r.id+'">Accept</button> <button class="btn o" data-r="'+r.id+'">Reject</button></div></div>';
+ });
+ h+='</div>';
+ const jobs=S.reqs.filter(r=>r.shop===s.id);
+ h+='<div class="card"><h2>My jobs</h2>';
+ if(!jobs.length)h+='<p class="muted">No jobs yet.</p>';
+ jobs.forEach(r=>{
+  const i=STEPS.indexOf(r.status),nx=STEPS[i+1];
+  h+='<div class="shop"><div><b>#'+r.id+' '+PROBLEMS[r.problem][0]+'</b> <span class="tag">'+LABEL[r.status]+'</span><br><span class="muted">₹'+r.price+(r.paid?' · paid':'')+'</span></div>'+
+  (r.status==="completed"||r.status==="cancelled"?'':'<button class="btn" data-n="'+r.id+'">Mark: '+LABEL[nx]+'</button>')+'</div>';
+ });
+ const earn=jobs.filter(r=>r.paid).reduce((a,r)=>a+r.final,0);
+ h+='<p><b>Earnings: ₹'+earn+'</b></p></div>';
+ return h;
+}
+function adminView(){
+ const done=S.reqs.filter(r=>r.status==="completed"),paid=S.reqs.filter(r=>r.paid);
+ const rev=Math.round(paid.reduce((a,r)=>a+r.final,0)*0.1);
+ let h='<div class="stats"><div><b>'+S.reqs.length+'</b><span>Requests</span></div><div><b>'+done.length+'</b><span>Completed</span></div><div><b>'+S.shops.filter(s=>s.verified).length+'/'+S.shops.length+'</b><span>Verified shops</span></div><div><b>₹'+rev+'</b><span>Fees (10%)</span></div></div>';
+ h+='<div class="card"><h2>Shops</h2><div class="scroll"><table><tr><th>Shop</th><th>Rating</th><th>Status</th><th></th></tr>'+
+ S.shops.map(s=>'<tr><td>'+s.name+'</td><td>'+s.rating+'</td><td>'+(s.verified?'<span class="tag ok">verified</span>':'<span class="tag bad">pending</span>')+'</td><td><button class="btn o" data-v="'+s.id+'">'+(s.verified?'Suspend':'Verify')+'</button></td></tr>').join("")+'</table></div></div>';
+ h+='<div class="card"><h2>All repair requests</h2><div class="scroll"><table><tr><th>#</th><th>Problem</th><th>Shop</th><th>Status</th><th>₹</th></tr>'+
+ (S.reqs.length?S.reqs.map(r=>'<tr><td>'+r.id+'</td><td>'+PROBLEMS[r.problem][0]+'</td><td>'+(r.shop?shopById(r.shop).name:"-")+'</td><td>'+LABEL[r.status]+'</td><td>'+(r.final||r.price||"-")+'</td></tr>').join(""):'<tr><td colspan="5" class="muted">No requests yet</td></tr>')+'</table></div></div>';
+ return h;
+}
+function render(){
+ $("nav").innerHTML=[["user","🚗 User"],["mech","🔧 Mechanic"],["admin","🛡️ Admin"]].map(t=>'<button data-t="'+t[0]+'" class="'+(S.tab===t[0]?'on':'')+'">'+t[1]+'</button>').join("");
+ $("app").innerHTML=S.tab==="user"?userView():S.tab==="mech"?mechView():adminView();
+ bind();
+}
+function bind(){
+ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{S.tab=b.dataset.t;render()});
+ const on=(id,f)=>{const e=$(id);if(e)e.onclick=f};
+ if($("veh")){$("veh").value=S.vehicle;$("rad").value=S.radius;$("prob").value=S.problem;$("note").value=S.note;
+  $("veh").onchange=e=>{S.vehicle=e.target.value;S.note=$("note").value;render()};
+  $("rad").onchange=e=>{S.radius=+e.target.value;S.note=$("note").value;render()};
+  $("prob").onchange=e=>{S.problem=e.target.value;S.note=$("note").value;render()};
+  $("note").oninput=e=>{S.note=e.target.value};}
+ on("send",broadcast);on("pay",pay);on("new",newReq);on("cancel",cancel);
+ document.querySelectorAll(".stars button").forEach(b=>b.onclick=()=>rate(+b.dataset.s));
+ if($("msel"))$("msel").onchange=e=>{S.mshop=+e.target.value;render()};
+ on("tog",()=>{const s=shopById(S.mshop);s.online=!s.online;render()});
+ document.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>accept(+b.dataset.a,S.mshop));
+ document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>reject(+b.dataset.r,S.mshop));
+ document.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>advance(+b.dataset.n));
+ document.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>{const s=shopById(+b.dataset.v);s.verified=!s.verified;render()});
+}
+render();
+</script>
+</body>
+</html>

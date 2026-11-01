@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "locations": {
+      "$requestId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || data.child('mechanicId').val() === auth.uid || newData.child('mechanicId').val() === auth.uid)"
+      }
+    },
+    "presence": {
+      "$shopId": {
+        ".read": true,
+        ".write": "auth != null"
+      }
+    }
+  }
+}

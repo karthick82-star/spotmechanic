@@ -1,0 +1,13 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /breakdown_photos/{photoId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+    match /shop_docs/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.resource.size < 15 * 1024 * 1024;
+    }
+  }
+}
